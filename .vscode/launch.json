@@ -1,0 +1,63 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            // "program": "demo.py",
+            "console": "integratedTerminal",
+            "args": [
+
+                // "--imagedir", "data/sfm_bench/rgb", 
+                // "--imagedir", "data/cater/rgb", 
+                // "--imagedir", "data/DAVIS-data/DAVIS/JPEGImages/480p/bear",
+                // "--imagedir", "data/DAVIS-data/DAVIS/JPEGImages/480p/cows",
+                "--imagedir", "data/DAVIS-data/DAVIS/JPEGImages/480p/car-turn",
+                // "--imagedir", "data/DAVIS-data/DAVIS/JPEGImages/1080p/car-turn",
+                // "--imagedir", "data/grg/rgb", 
+
+                // "--calib", "calib/eth.txt",
+                "--calib", "data/cater/calibration.txt",
+
+
+                // "--objmaskdir", "data/cater/objmasks1", 
+                // "--objmaskdir", "data/cater/objmasks3", 
+                // "--objmaskdir", "data/cater/objmasks6", 
+                // "--objmaskdir", "data/cater/objmasks7", 
+                // "--objmaskdir", "data/DAVIS-data/DAVIS/Annotations/480p/bear",
+                // "--objmaskdir", "data/DAVIS-data/DAVIS/Annotations/480p/cows",
+                "--objmaskdir", "data/DAVIS-data/DAVIS/Annotations/480p/car-turn",
+                // "--objmaskdir", "data/DAVIS-data/DAVIS/Annotations/1080p/car-turn",
+
+
+                "--stride", "1", //"3",
+                
+                
+                // "--weights", default="droid.pth",
+                "--buffer", "512",
+                // "--image_size", default=[240, 320],
+                // "--disable_vis", action="store_true",
+
+                "--beta", "0.3", //"weight for translation / rotation components of flow",
+                "--filter_thresh", "0.4", //"0.2", //"0.5", //"2.4", //"how much motion before considering new keyframe",
+                "--warmup", "5", //"8", //"number of warmup frames",
+                "--keyframe_thresh", "1.0", //"2.0", //"4.0", //"threshold to create a new keyframe",
+                "--frontend_thresh", "1.0", //"16.0", //"add edges between frames whithin this distance",
+                "--frontend_window", "25", //"frontend optimization window",
+                "--frontend_radius", "1", //"2", //"force edges between frames within radius",
+                "--frontend_nms", "1", //"non-maximal supression of edges",
+
+                "--backend_thresh", "22.0",
+                "--backend_radius", "2",
+                "--backend_nms", "3",
+
+
+            ]
+        }
+    ]
+}

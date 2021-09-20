@@ -138,8 +138,10 @@ class UpdateModule(nn.Module):
         assert np.array_equal(objmask[:,0].cpu(), objmask[:,2].cpu()) and np.array_equal(objmask[:,0].cpu(), objmask[:,1].cpu()), "Error! Object mask not consistent across RGB channels."
         scaled_objmask = F.interpolate(objmask, size = tuple(weight.shape[-2:]), mode = "nearest")
         scaled_objmask = scaled_objmask[:,:2].unsqueeze(0)
-        scaled_objmask[scaled_objmask == 255] = 1
-        assert np.array_equal([0, 1],  np.unique(scaled_objmask.cpu())), "Error! Object mask is not binary (0, 1)."
+        # scaled_objmask[scaled_objmask == 255] = 1
+        scaled_objmask[scaled_objmask == 255] = 100
+        # assert np.array_equal([0, 1],  np.unique(scaled_objmask.cpu())), "Error! Object mask is not binary (0, 1)."
+        assert np.array_equal([0, 100],  np.unique(scaled_objmask.cpu())), "Error! Object mask is not binary (0, 1)."
         assert scaled_objmask.shape == weight.shape, "Error! Dimesntions mismatch."
         weight = scaled_objmask
 
@@ -206,6 +208,8 @@ class DroidNet(nn.Module):
 
         Gs_list, disp_list, residual_list = [], [], []
         for step in range(num_steps):
+
+           
             Gs = Gs.detach()
             disps = disps.detach()
             coords1 = coords1.detach()
