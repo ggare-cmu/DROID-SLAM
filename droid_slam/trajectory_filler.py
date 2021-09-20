@@ -32,11 +32,12 @@ class PoseTrajectoryFiller:
         """ features for correlation volume """
         return self.fnet(image)
 
-    def __fill(self, tstamps, images, intrinsics):
+    def __fill(self, tstamps, images, objmasks, intrinsics):
         """ fill operator """
 
         tt = torch.as_tensor(tstamps, device="cuda")
         images = torch.stack(images, 0)
+        objmasks = torch.stack(objmasks, 0)
         intrinsics = torch.stack(intrinsics, 0)
         inputs = images[:,:,[2,1,0]].to(self.device) / 255.0
         
@@ -62,7 +63,7 @@ class PoseTrajectoryFiller:
         fmap = self.__feature_encoder(inputs)
 
         self.video.counter.value += M
-        self.video[N:N+M] = (tt, images[:,0], Gs.data, 1, None, intrinsics / 8.0, fmap)
+        self.video[N:N+M] = (tt, images[:,0], objmasks[:,0], Gs.data, 1, None, intrinsics / 8.0, fmap)
 
         graph = FactorGraph(self.video, self.update)
         graph.add_factors(t0.cuda(), torch.arange(N, N+M).cuda())
@@ -85,19 +86,21 @@ class PoseTrajectoryFiller:
 
         tstamps = []
         images = []
+        objmasks = []
         intrinsics = []
         
-        for (tstamp, image, intrinsic) in image_stream:
+        for (tstamp, image, objmask, intrinsic) in image_stream:
             tstamps.append(tstamp)
             images.append(image)
+            objmasks.append(objmask)
             intrinsics.append(intrinsic)
 
             if len(tstamps) == 16:
-                pose_list += self.__fill(tstamps, images, intrinsics)
-                tstamps, images, intrinsics = [], [], []
+                pose_list += self.__fill(tstamps, images, objmasks, intrinsics)
+                tstamps, images, objmasks, intrinsics = [], [], [], []
 
         if len(tstamps) > 0:
-            pose_list += self.__fill(tstamps, images, intrinsics)
+            pose_list += self.__fill(tstamps, images, objmasks, intrinsics)
 
         # stitch pose segments together
         return lietorch.cat(pose_list, 0)

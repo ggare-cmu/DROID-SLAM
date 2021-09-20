@@ -25,7 +25,7 @@ class FactorGraph:
         self.jj = torch.as_tensor([], dtype=torch.long, device=device)
         self.age = torch.as_tensor([], dtype=torch.long, device=device)
 
-        self.corr, self.net, self.inp = None, None, None
+        self.corr, self.net, self.objmask, self.inp = None, None, None, None
         self.damping = 1e-6 * torch.ones_like(self.video.disps)
 
         self.target = torch.zeros([1, 0, ht, wd, 2], device=device, dtype=torch.float)
@@ -79,6 +79,7 @@ class FactorGraph:
     def clear_edges(self):
         self.rm_factors(self.ii >= 0)
         self.net = None
+        self.objmask = None
         self.inp = None
 
     @torch.cuda.amp.autocast(enabled=True)
@@ -106,6 +107,7 @@ class FactorGraph:
             self.rm_factors(ix >= self.max_factors - ii.shape[0], store=True)
 
         net = self.video.nets[ii].to(self.device).unsqueeze(0)
+        objmask = self.video.objmasks[ii] 
 
         # correlation volume for new edges
         if self.corr_impl == "volume":
@@ -128,6 +130,7 @@ class FactorGraph:
 
         # reprojection factors
         self.net = net if self.net is None else torch.cat([self.net, net], 1)
+        self.objmask = objmask if self.objmask is None else torch.cat([self.objmask, objmask], 0)
 
         self.target = torch.cat([self.target, target], 1)
         self.weight = torch.cat([self.weight, weight], 1)
@@ -152,6 +155,9 @@ class FactorGraph:
 
         if self.net is not None:
             self.net = self.net[:,~mask]
+        
+        if self.objmask is not None:
+            self.objmask = self.objmask[~mask]
 
         if self.inp is not None:
             self.inp = self.inp[:,~mask]
@@ -205,8 +211,8 @@ class FactorGraph:
         # correlation features
         corr = self.corr(coords1)
 
-        self.net, delta, weight, damping, upmask = \
-            self.update_op(self.net, self.inp, corr, motn, self.ii, self.jj)
+        self.net, delta, weight, damping, upmask, self.objmask = \
+            self.update_op(self.net, self.inp, corr, motn, self.ii, self.jj, self.objmask)
 
         if t0 is None:
             t0 = max(1, self.ii.min().item()+1)
@@ -269,11 +275,12 @@ class FactorGraph:
 
                 with torch.cuda.amp.autocast(enabled=True):
                  
-                    net, delta, weight, damping, _ = \
-                        self.update_op(self.net[:,v], self.video.inps[None,iis], corr1, motn[:,v], iis, jjs)
+                    net, delta, weight, damping, _, objmask = \
+                        self.update_op(self.net[:,v], self.video.inps[None,iis], corr1, motn[:,v], iis, jjs, self.objmask[v])
 
 
                 self.net[:,v] = net
+                self.objmask[v] = objmask
                 self.target[:,v] = coords1[:,v] + delta.float()
                 self.weight[:,v] = weight.float()
                 self.damping[torch.unique(iis)] = damping

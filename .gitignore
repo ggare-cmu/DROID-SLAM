@@ -156,3 +156,5 @@ data
 figures/*.pdf
 
 
+Custom_videos/*
+CATER_dataset/*

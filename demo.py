@@ -17,12 +17,25 @@ from droid import Droid
 import torch.nn.functional as F
 
 
+def show_imageNobjmask(image, objmask):
+    image = torch.cat((image, objmask), dim = 1)
+    
+    image = image.permute(1, 2, 0).cpu().numpy()
+    cv2.imshow('image', image / 255.0)
+    cv2.waitKey(1)
+
+
 def show_image(image):
     image = image.permute(1, 2, 0).cpu().numpy()
     cv2.imshow('image', image / 255.0)
     cv2.waitKey(1)
 
-def image_stream(imagedir, calib, stride):
+def show_objmask(objmask):
+    objmask = objmask.permute(1, 2, 0).cpu().numpy()
+    cv2.imshow('obj_mask', objmask / 255.0)
+    cv2.waitKey(1)
+
+def image_stream(imagedir, objmaskdir, calib, stride):
     """ image generator """
 
     calib = np.loadtxt(calib, delimiter=" ")
@@ -34,12 +47,21 @@ def image_stream(imagedir, calib, stride):
     K[1,1] = fy
     K[1,2] = cy
 
+
+    obj_mask_list = sorted(os.listdir(objmaskdir))[::stride]
+
     image_list = sorted(os.listdir(imagedir))[::stride]
 
-    for t, imfile in enumerate(image_list):
+    for t, (imfile, objmaskfile) in enumerate(zip(image_list, obj_mask_list)):
+
         image = cv2.imread(os.path.join(imagedir, imfile))
+        
+        objmask = cv2.imread(os.path.join(objmaskdir, objmaskfile))
+
         if len(calib) > 4:
             image = cv2.undistort(image, K, calib[4:])
+            #TODO-GRG: Ensure that post undistort interpolation we have only binary (0 or 1) mask values no floats (eg. 0.1) 
+            objmask = cv2.undistort(objmask, K, calib[4:])
 
         h0, w0, _ = image.shape
         h1 = int(h0 * np.sqrt((384 * 512) / (h0 * w0)))
@@ -49,16 +71,22 @@ def image_stream(imagedir, calib, stride):
         image = image[:h1-h1%8, :w1-w1%8]
         image = torch.as_tensor(image).permute(2, 0, 1)
 
+        objmask = cv2.resize(objmask, (w1, h1), interpolation = cv2.INTER_NEAREST)
+        objmask = objmask[:h1-h1%8, :w1-w1%8]
+        objmask = torch.as_tensor(objmask).permute(2, 0, 1)
+        assert np.array_equal([0, 255],  np.unique(objmask)) or np.array_equal([0],  np.unique(objmask)), "Error! Object mask is not binary (0, 1)."
+
         intrinsics = torch.as_tensor([fx, fy, cx, cy])
         intrinsics[0::2] *= (w1 / w0)
         intrinsics[1::2] *= (h1 / h0)
 
-        yield t, image[None], intrinsics
+        yield t, image[None], objmask[None], intrinsics
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--imagedir", type=str, help="path to image directory")
+    parser.add_argument("--objmaskdir", type=str, help="path to obj mask directory")
     parser.add_argument("--calib", type=str, help="path to calibration file")
     parser.add_argument("--t0", default=0, type=int, help="starting frame")
     parser.add_argument("--stride", default=3, type=int, help="frame stride")
@@ -88,17 +116,19 @@ if __name__ == '__main__':
     droid = None
 
     tstamps = []
-    for (t, image, intrinsics) in tqdm(image_stream(args.imagedir, args.calib, args.stride)):
+    for (t, image, objmask, intrinsics) in tqdm(image_stream(args.imagedir, args.objmaskdir, args.calib, args.stride)):
         if t < args.t0:
             continue
 
         if not args.disable_vis:
-            show_image(image[0])
+            # show_image(image[0])
+            # show_objmask(objmask[0])
+            show_imageNobjmask(image[0], objmask[0])
 
         if droid is None:
             args.image_size = [image.shape[2], image.shape[3]]
             droid = Droid(args)
         
-        droid.track(t, image, intrinsics=intrinsics)
+        droid.track(t, image, objmask, intrinsics=intrinsics)
 
-    traj_est = droid.terminate(image_stream(args.imagedir, args.calib, args.stride))
+    traj_est = droid.terminate(image_stream(args.imagedir, args.objmaskdir, args.calib, args.stride))

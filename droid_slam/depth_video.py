@@ -21,6 +21,7 @@ class DepthVideo:
         ### state attributes ###
         self.tstamp = torch.zeros(buffer, device="cuda", dtype=torch.float).share_memory_()
         self.images = torch.zeros(buffer, 3, ht, wd, device="cuda", dtype=torch.uint8)
+        self.objmasks = torch.zeros(buffer, 3, ht, wd, device="cuda", dtype=torch.uint8)
         self.dirty = torch.zeros(buffer, device="cuda", dtype=torch.bool).share_memory_()
         self.red = torch.zeros(buffer, device="cuda", dtype=torch.bool).share_memory_()
         self.poses = torch.zeros(buffer, 7, device="cuda", dtype=torch.float).share_memory_()
@@ -53,28 +54,29 @@ class DepthVideo:
         # self.dirty[index] = True
         self.tstamp[index] = item[0]
         self.images[index] = item[1]
-
-        if item[2] is not None:
-            self.poses[index] = item[2]
+        self.objmasks[index] = item[2]
 
         if item[3] is not None:
-            self.disps[index] = item[3]
+            self.poses[index] = item[3]
 
         if item[4] is not None:
-            depth = item[4][3::8,3::8]
-            self.disps_sens[index] = torch.where(depth>0, 1.0/depth, depth)
+            self.disps[index] = item[4]
 
         if item[5] is not None:
-            self.intrinsics[index] = item[5]
+            depth = item[5][3::8,3::8]
+            self.disps_sens[index] = torch.where(depth>0, 1.0/depth, depth)
 
-        if len(item) > 6:
-            self.fmaps[index] = item[6]
+        if item[6] is not None:
+            self.intrinsics[index] = item[6]
 
         if len(item) > 7:
-            self.nets[index] = item[7]
+            self.fmaps[index] = item[7]
 
         if len(item) > 8:
-            self.inps[index] = item[8]
+            self.nets[index] = item[8]
+
+        if len(item) > 9:
+            self.inps[index] = item[9]
 
     def __setitem__(self, index, item):
         with self.get_lock():
